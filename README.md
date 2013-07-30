@@ -1,5 +1,8 @@
+nr-node
+=======
+
 Node Package to Report via NewRelic Platform API
-================================================
+
 
 We're experimenting with measurement devices
 hosted on a Raspberry Pi. We're using Node.js
