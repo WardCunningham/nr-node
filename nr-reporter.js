@@ -23,6 +23,64 @@ component.name = "Raspberry Pi in Java Agent Pod";
 component.duration = 0;
 component.metrics = {};
 
+function process_api_response (res) {
+  res.setEncoding('utf-8');
+  console.log('STATUS: ' + res.statusCode);
+  console.log('HEADERS: ' + JSON.stringify(res.headers));
+
+  switch (res.statusCode) {
+    case 200:
+    case 204:
+      component.metrics = {}
+      last_poll_time = new Date();
+      stats = {}
+      return; // our work is done for this minute
+    case 400:
+      // your request was malformed
+      // consider reporting a "supportability" metric which counts the number of 400 responses you get
+      // for example "Component/Supportability/http_error_codes/400"
+      // you can use this on a "Supportability" Dashboard that helps diagnose your agent
+    case 403:
+      // forbidden probably due to a bad license key
+      // log error and shutdown the agent
+    case 404:
+      // invalid URL
+      // you should never get this error for https://platform-api.newrelic.com/platform/v1/metrics
+    case 405:
+      // invalid method
+      // HTTP verb should be "POST"
+    case 413:
+      // POST body too large
+      // try splitting at component boundaries
+      // split along metric name spaces
+      // fail gracefully - consider reporting a supportability metric (see 400)
+    case 500:
+      // error on New Relic's servers
+      // could be due to malformed data or system trouble
+      // fail gracefully - consider reporting a supportability metric (see 400)
+    case 503:
+    case 504:
+      // New Relic servers busy - this happens by design from time-to-time
+      // keep collecting metrics
+      // do NOT reset last_poll_time
+      // log error if the problem persists for several minutes
+      console.log("status: ", res.statusCode, " -- see source for meaning")
+      break;
+    default:
+      console.log("status: ", res.statusCode, " -- no explaination, sorry")
+  }
+
+  var responseString = '';
+
+  res.on('data', function(data) {
+    responseString += data;
+  });
+
+  res.on('end', function() {
+    console.log(responseString);
+  });
+
+}
 
 function loop () {
   console.log('sending');
@@ -57,66 +115,7 @@ function loop () {
     headers: headers
   };
   
-  var req = http.request(options, function(res) {
-    res.setEncoding('utf-8');
-    console.log('STATUS: ' + res.statusCode);
-    console.log('HEADERS: ' + JSON.stringify(res.headers));
-    
-    switch (res.statusCode) {
-      case 200:
-      case 204:
-        component.metrics = {}
-        last_poll_time = new Date();
-        stats = {}
-        break;
-      case 400:
-        // your request was malformed
-        // consider reporting a "supportability" metric which counts the number of 400 responses you get
-        // for example "Component/Supportability/http_error_codes/400"
-        // you can use this on a "Supportability" Dashboard that helps diagnose your agent
-      case 403:
-        // forbidden probably due to a bad license key
-        // log error and shutdown the agent
-      case 404:
-        // invalid URL
-        // you should never get this error for https://platform-api.newrelic.com/platform/v1/metrics
-      case 405:
-        // invalid method
-        // HTTP verb should be "POST"
-      case 413:
-        // POST body too large
-        // try splitting at component boundaries
-        // split along metric name spaces
-        // fail gracefully - consider reporting a supportability metric (see 400)
-      case 500:
-        // error on New Relic's servers
-        // could be due to malformed data or system trouble
-        // fail gracefully - consider reporting a supportability metric (see 400)
-      case 503:
-      case 504:
-        // New Relic servers busy - this happens by design from time-to-time
-        // keep collecting metrics
-        // do NOT reset last_poll_time
-        // log error if the problem persists for several minutes
-        console.log("status: ", res.statusCode, " -- see source for meaning")
-        break;
-      default:
-        console.log("status: ", res.statusCode, " -- no explaination, sorry")
-    }
-    
-    
-    var responseString = '';
-
-    res.on('data', function(data) {
-      responseString += data;
-    });
-
-    res.on('end', function() {
-      var resultObject = JSON.parse(responseString);
-      console.log(resultObject);
-    });
-    
-  });
+  var req = http.request(options, process_api_response);
   req.write(json_to_send);
   req.end();
 }
