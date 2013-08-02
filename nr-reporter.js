@@ -5,12 +5,13 @@ var http = require('http');
 
 var platform_api_uri = "https://platform-api.newrelic.com/platform/v1/metrics";
 var poll_cycle = 60; // time in seconds
-var version = "1.0.1"; // major_version.minor_version.patch_level
+var version = "1.0.2"; // major_version.minor_version.patch_level
 var agent_host = os.hostname();
 var agent_pid = process.pid;
-var last_poll_time = new Date()-60000;
+var last_poll_time = new Date();
 
 var agent_hash = {host: agent_host, pid: agent_pid, version: version};
+var license_key = null;
 
 var signals = {}; // not aggregated (from callback)
 var stats = {}; // aggregated (from calls)
@@ -18,8 +19,7 @@ var stats = {}; // aggregated (from calls)
 //     for each monitored_component do
 
 component = {};
-component.guid = "com.newrelic.rpi_javapod";
-component.name = "Raspberry Pi in Java Agent Pod";
+component.guid = "com.example.nr-node";
 component.duration = 0;
 component.metrics = {};
 
@@ -104,7 +104,7 @@ function loop () {
     'Content-Type': 'application/json',
     'Content-Length': json_to_send.length,
     'Accept':"application/json",
-    'X-License-Key': '79f64277817661e8a5115b452f02f427a31f45b5'
+    'X-License-Key': license_key
   };
   
   var options = {
@@ -125,10 +125,17 @@ setInterval(loop, 60000);
 console.log('reporting');
 
 var reporter = {
+
+  setup: function(options) {
+    component.name = options.name;
+    license_key = options.license_key;
+  },
+
   signal: function (name, funct) {
     console.log('signal', name);
     signals[name] = funct;
   },
+
   stat: function (name, value) {
     var s = stats[name];
     if (!s) {
