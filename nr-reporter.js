@@ -19,7 +19,6 @@ var stats = {}; // aggregated (from calls)
 //     for each monitored_component do
 
 component = {};
-component.guid = "com.example.nr-node";
 component.duration = 0;
 component.metrics = {};
 
@@ -128,6 +127,7 @@ var reporter = {
 
   setup: function(options) {
     component.name = options.name;
+    component.guid = options.guid;
     license_key = options.license_key;
   },
 
